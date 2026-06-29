@@ -1,0 +1,14 @@
+# Local testing / alternative Dokploy "Compose" deployment.
+# For a Dokploy "Application" (Dockerfile) deployment you do NOT need this file:
+# Dokploy builds the Dockerfile and routes its domain to the exposed port 8080.
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: solar-system-3d:latest
+    restart: unless-stopped
+    # Host 8080 -> container 8080 (nginx-unprivileged). Change the host port if
+    # 8080 is taken locally. In Dokploy, remove this and let the proxy handle it.
+    ports:
+      - "8080:8080"

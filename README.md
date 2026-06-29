@@ -47,7 +47,43 @@ src/utils/solarSystem.ts         Three.js scene and interaction logic
 src/data/planets.ts              Single source of truth (physics, facts, orbital data and comet)
 src/data/planets.test.ts         Data integrity tests (Vitest)
 public/textures/                 Textures used by Earth and the Moon
+Dockerfile                       Multi-stage build (Node builder + nginx)
+nginx.conf                       Static file serving, caching and security headers
+docker-compose.yml               Local run / alternative Compose deployment
 ```
+
+## Deployment (Docker / Dokploy)
+
+The site builds to static files and is served by nginx, packaged as a small
+multi-stage image (Node builder → `nginx-unprivileged`, runs as non-root and
+listens on port **8080**).
+
+Local test:
+
+```sh
+docker compose up --build
+# open http://localhost:8080
+```
+
+Or with plain Docker:
+
+```sh
+docker build -t solar-system-3d .
+docker run --rm -p 8080:8080 solar-system-3d
+```
+
+### Dokploy (self-hosted)
+
+1. Create an **Application** and point it at this Git repository.
+2. Build type: **Dockerfile** (the repo's `Dockerfile` is detected automatically).
+3. Set the application/container port to **8080**.
+4. Add your **Domain** in Dokploy; its built-in proxy (Traefik) terminates TLS
+   and routes the domain to port 8080. No environment variables are required —
+   this is a fully static site with no external services.
+5. Deploy. Every push can trigger a rebuild via Dokploy's webhook.
+
+The `docker-compose.yml` is only needed for local runs or if you prefer
+Dokploy's **Compose** deployment type instead of the Dockerfile application.
 
 ## A note on scale
 
