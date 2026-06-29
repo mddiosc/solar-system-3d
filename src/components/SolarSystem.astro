@@ -5,57 +5,57 @@ const bodies = [SUN, ...PLANETS];
 ---
 
 <div class="solar-stage">
-  <div class="loader" data-loader role="status">Preparando órbitas…</div>
-  <section class="intro" data-intro aria-label="Introducción">
-    <p>Observatorio orbital</p>
-    <h1>Sistema Solar 3D</h1>
-    <span>Arrastra para orbitar, pellizca o usa la rueda para acercarte. Toca un planeta para enfocarlo.</span>
-    <button data-hide-intro>Explorar</button>
+  <div class="loader" data-loader role="status">Preparing orbits…</div>
+  <section class="intro" data-intro aria-label="Introduction">
+    <p>Orbital observatory</p>
+    <h1>Solar System 3D</h1>
+    <span>Drag to orbit, pinch or scroll to zoom in. Tap a planet to focus it.</span>
+    <button data-hide-intro>Explore</button>
   </section>
   <div class="fallback" data-fallback hidden>
-    Tu navegador no tiene WebGL activo. Prueba con otro navegador o activa la aceleración por hardware para ver el
-    sistema solar 3D.
+    Your browser does not have WebGL enabled. Try another browser or enable hardware acceleration to view the 3D solar
+    system.
   </div>
-  <canvas id="solar-system" aria-label="Sistema Solar interactivo en 3D"></canvas>
-  <div class="toolbar" aria-label="Controles del sistema solar">
-    <button data-pause aria-pressed="false">Pausar</button>
-    <label>Velocidad <input data-speed type="range" min="0" max="2" value="1" step="0.1" /></label>
+  <canvas id="solar-system" aria-label="Interactive 3D solar system"></canvas>
+  <div class="toolbar" aria-label="Solar system controls">
+    <button data-pause aria-pressed="false">Pause</button>
+    <label>Speed <input data-speed type="range" min="0" max="2" value="1" step="0.1" /></label>
     <label
-      >Ir a
-      <select data-planet-select aria-label="Ir a un cuerpo">
+      >Go to
+      <select data-planet-select aria-label="Go to a body">
         <option value="">—</option>
         {bodies.map((body) => <option value={body.name}>{body.label}</option>)}
       </select>
     </label>
     <div class="toolbar-extra" data-extra>
       <label
-        >Fecha
-        <input data-date type="date" aria-label="Posición de los planetas en una fecha" />
+        >Date
+        <input data-date type="date" aria-label="Planet positions on a date" />
       </label>
-      <button data-today>Hoy</button>
+      <button data-today>Today</button>
       <button data-reset>Reset</button>
       <button data-tour aria-pressed="false">Tour</button>
       <button data-labels aria-pressed="true">Labels</button>
-      <button data-orbits aria-pressed="true">Órbitas</button>
-      <button data-scale aria-pressed="false">Escala real</button>
-      <button data-share>Compartir</button>
-      <button data-perf aria-pressed="false">Rendimiento</button>
+      <button data-orbits aria-pressed="true">Orbits</button>
+      <button data-scale aria-pressed="false">Real scale</button>
+      <button data-share>Share</button>
+      <button data-perf aria-pressed="false">Performance</button>
     </div>
-    <button class="toolbar-more" data-more aria-expanded="false" aria-label="Más controles">⋯</button>
+    <button class="toolbar-more" data-more aria-expanded="false" aria-label="More controls">⋯</button>
   </div>
   <div class="perf-panel" data-perf-panel hidden role="status" aria-live="off">
     <span data-perf-fps>—</span> FPS
   </div>
   <aside class="planet-card" data-card hidden aria-live="polite">
-    <button class="card-close" data-card-close type="button" aria-label="Cerrar ficha">×</button>
+    <button class="card-close" data-card-close type="button" aria-label="Close panel">×</button>
     <p data-card-type></p>
     <h2 data-card-name></h2>
     <dl class="planet-stats">
-      <div><dt>Diámetro</dt><dd data-card-diameter></dd></div>
-      <div><dt>Lunas</dt><dd data-card-moons></dd></div>
-      <div><dt>Día</dt><dd data-card-day></dd></div>
-      <div><dt>Año</dt><dd data-card-year></dd></div>
-      <div><dt>Temperatura</dt><dd data-card-temp></dd></div>
+      <div><dt>Diameter</dt><dd data-card-diameter></dd></div>
+      <div><dt>Moons</dt><dd data-card-moons></dd></div>
+      <div><dt>Day</dt><dd data-card-day></dd></div>
+      <div><dt>Year</dt><dd data-card-year></dd></div>
+      <div><dt>Temperature</dt><dd data-card-temp></dd></div>
     </dl>
     <small data-card-note></small>
   </aside>
@@ -77,7 +77,7 @@ const bodies = [SUN, ...PLANETS];
       console.error('SolarSystem init failed', error);
       loader?.remove();
       if (fallback)
-        fallback.textContent = `No se pudo iniciar la escena 3D: ${error instanceof Error ? error.message : String(error)}`;
+        fallback.textContent = `Could not start the 3D scene: ${error instanceof Error ? error.message : String(error)}`;
       fallback?.removeAttribute('hidden');
       return;
     }
@@ -106,7 +106,7 @@ const bodies = [SUN, ...PLANETS];
     pause?.addEventListener('click', () => {
       const pressed = pause.getAttribute('aria-pressed') !== 'true';
       pause.setAttribute('aria-pressed', String(pressed));
-      pause.textContent = pressed ? 'Reanudar' : 'Pausar';
+      pause.textContent = pressed ? 'Resume' : 'Pause';
       solarSystem.setPaused(pressed);
     });
     speed?.addEventListener('input', () => solarSystem.setSpeed(Number(speed.value)));
@@ -123,7 +123,7 @@ const bodies = [SUN, ...PLANETS];
     });
     const setTourActive = (active: boolean) => {
       tour?.setAttribute('aria-pressed', String(active));
-      if (tour) tour.textContent = active ? 'Detener' : 'Tour';
+      if (tour) tour.textContent = active ? 'Stop' : 'Tour';
     };
     tour?.addEventListener('click', () => {
       const active = tour.getAttribute('aria-pressed') !== 'true';
@@ -194,12 +194,12 @@ const bodies = [SUN, ...PLANETS];
       history.replaceState(null, '', url);
       try {
         await navigator.clipboard.writeText(url);
-        share.textContent = '¡Copiado!';
+        share.textContent = 'Copied!';
       } catch {
-        share.textContent = 'URL lista';
+        share.textContent = 'URL ready';
       }
       clearTimeout(shareReset);
-      shareReset = setTimeout(() => (share.textContent = 'Compartir'), 1600);
+      shareReset = setTimeout(() => (share.textContent = 'Share'), 1600);
     });
 
     perf?.addEventListener('click', () => {
