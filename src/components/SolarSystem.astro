@@ -1,0 +1,695 @@
+---
+import { SUN, PLANETS } from '../data/planets';
+
+const bodies = [SUN, ...PLANETS];
+---
+
+<div class="solar-stage">
+  <div class="loader" data-loader role="status">Preparando órbitas…</div>
+  <section class="intro" data-intro aria-label="Introducción">
+    <p>Observatorio orbital</p>
+    <h1>Sistema Solar 3D</h1>
+    <span>Arrastra para orbitar, pellizca o usa la rueda para acercarte. Toca un planeta para enfocarlo.</span>
+    <button data-hide-intro>Explorar</button>
+  </section>
+  <div class="fallback" data-fallback hidden>
+    Tu navegador no tiene WebGL activo. Prueba con otro navegador o activa la aceleración por hardware para ver el
+    sistema solar 3D.
+  </div>
+  <canvas id="solar-system" aria-label="Sistema Solar interactivo en 3D"></canvas>
+  <div class="toolbar" aria-label="Controles del sistema solar">
+    <button data-pause aria-pressed="false">Pausar</button>
+    <label>Velocidad <input data-speed type="range" min="0" max="2" value="1" step="0.1" /></label>
+    <label
+      >Ir a
+      <select data-planet-select aria-label="Ir a un cuerpo">
+        <option value="">—</option>
+        {bodies.map((body) => <option value={body.name}>{body.label}</option>)}
+      </select>
+    </label>
+    <div class="toolbar-extra" data-extra>
+      <label
+        >Fecha
+        <input data-date type="date" aria-label="Posición de los planetas en una fecha" />
+      </label>
+      <button data-today>Hoy</button>
+      <button data-reset>Reset</button>
+      <button data-tour aria-pressed="false">Tour</button>
+      <button data-labels aria-pressed="true">Labels</button>
+      <button data-orbits aria-pressed="true">Órbitas</button>
+      <button data-scale aria-pressed="false">Escala real</button>
+      <button data-share>Compartir</button>
+      <button data-perf aria-pressed="false">Rendimiento</button>
+    </div>
+    <button class="toolbar-more" data-more aria-expanded="false" aria-label="Más controles">⋯</button>
+  </div>
+  <div class="perf-panel" data-perf-panel hidden role="status" aria-live="off">
+    <span data-perf-fps>—</span> FPS
+  </div>
+  <aside class="planet-card" data-card hidden aria-live="polite">
+    <button class="card-close" data-card-close type="button" aria-label="Cerrar ficha">×</button>
+    <p data-card-type></p>
+    <h2 data-card-name></h2>
+    <dl class="planet-stats">
+      <div><dt>Diámetro</dt><dd data-card-diameter></dd></div>
+      <div><dt>Lunas</dt><dd data-card-moons></dd></div>
+      <div><dt>Día</dt><dd data-card-day></dd></div>
+      <div><dt>Año</dt><dd data-card-year></dd></div>
+      <div><dt>Temperatura</dt><dd data-card-temp></dd></div>
+    </dl>
+    <small data-card-note></small>
+  </aside>
+</div>
+
+<script>
+  import { SolarSystem } from '../utils/solarSystem';
+
+  const initSolarSystem = async () => {
+    const canvas = document.querySelector<HTMLCanvasElement>('#solar-system');
+    const loader = document.querySelector<HTMLElement>('[data-loader]');
+    const fallback = document.querySelector<HTMLElement>('[data-fallback]');
+    if (!canvas) return;
+
+    let solarSystem: SolarSystem;
+    try {
+      solarSystem = new SolarSystem(canvas);
+    } catch (error) {
+      console.error('SolarSystem init failed', error);
+      loader?.remove();
+      if (fallback)
+        fallback.textContent = `No se pudo iniciar la escena 3D: ${error instanceof Error ? error.message : String(error)}`;
+      fallback?.removeAttribute('hidden');
+      return;
+    }
+    const pause = document.querySelector<HTMLButtonElement>('[data-pause]');
+    const speed = document.querySelector<HTMLInputElement>('[data-speed]');
+    const labels = document.querySelector<HTMLButtonElement>('[data-labels]');
+    const orbits = document.querySelector<HTMLButtonElement>('[data-orbits]');
+    const tour = document.querySelector<HTMLButtonElement>('[data-tour]');
+    const card = document.querySelector<HTMLElement>('[data-card]');
+    const cardClose = document.querySelector<HTMLButtonElement>('[data-card-close]');
+    const planetSelect = document.querySelector<HTMLSelectElement>('[data-planet-select]');
+    const scale = document.querySelector<HTMLButtonElement>('[data-scale]');
+    const dateInput = document.querySelector<HTMLInputElement>('[data-date]');
+    const today = document.querySelector<HTMLButtonElement>('[data-today]');
+    const share = document.querySelector<HTMLButtonElement>('[data-share]');
+    const perf = document.querySelector<HTMLButtonElement>('[data-perf]');
+    const perfPanel = document.querySelector<HTMLElement>('[data-perf-panel]');
+    const perfFps = document.querySelector<HTMLElement>('[data-perf-fps]');
+    const more = document.querySelector<HTMLButtonElement>('[data-more]');
+    const extra = document.querySelector<HTMLElement>('[data-extra]');
+
+    loader?.classList.add('is-hidden');
+    document
+      .querySelector('[data-hide-intro]')
+      ?.addEventListener('click', () => document.querySelector('[data-intro]')?.classList.add('is-hidden'));
+    pause?.addEventListener('click', () => {
+      const pressed = pause.getAttribute('aria-pressed') !== 'true';
+      pause.setAttribute('aria-pressed', String(pressed));
+      pause.textContent = pressed ? 'Reanudar' : 'Pausar';
+      solarSystem.setPaused(pressed);
+    });
+    speed?.addEventListener('input', () => solarSystem.setSpeed(Number(speed.value)));
+    document.querySelector('[data-reset]')?.addEventListener('click', () => solarSystem.resetCamera());
+    labels?.addEventListener('click', () => {
+      const pressed = labels.getAttribute('aria-pressed') !== 'true';
+      labels.setAttribute('aria-pressed', String(pressed));
+      solarSystem.setLabelsVisible(pressed);
+    });
+    orbits?.addEventListener('click', () => {
+      const pressed = orbits.getAttribute('aria-pressed') !== 'true';
+      orbits.setAttribute('aria-pressed', String(pressed));
+      solarSystem.setOrbitsVisible(pressed);
+    });
+    const setTourActive = (active: boolean) => {
+      tour?.setAttribute('aria-pressed', String(active));
+      if (tour) tour.textContent = active ? 'Detener' : 'Tour';
+    };
+    tour?.addEventListener('click', () => {
+      const active = tour.getAttribute('aria-pressed') !== 'true';
+      setTourActive(active);
+      if (active) solarSystem.startTour();
+      else solarSystem.stopTour();
+    });
+    canvas.addEventListener('tourend', () => setTourActive(false));
+    type PlanetFacts = {
+      type: string;
+      diameter: string;
+      moons: string;
+      day: string;
+      year: string;
+      temp: string;
+      note: string;
+    };
+    canvas.addEventListener('select', ((event: CustomEvent<{ key: string; name: string; facts: PlanetFacts }>) => {
+      card?.removeAttribute('hidden');
+      const { key, name, facts } = event.detail;
+      if (planetSelect) planetSelect.value = key;
+      const set = (selector: string, value: string) => {
+        const el = document.querySelector(selector);
+        if (el) el.textContent = value;
+      };
+      set('[data-card-name]', name);
+      set('[data-card-type]', facts.type);
+      set('[data-card-diameter]', facts.diameter);
+      set('[data-card-moons]', facts.moons);
+      set('[data-card-day]', facts.day);
+      set('[data-card-year]', facts.year);
+      set('[data-card-temp]', facts.temp);
+      set('[data-card-note]', facts.note);
+    }) as EventListener);
+
+    const closeCard = () => {
+      card?.setAttribute('hidden', '');
+      if (planetSelect) planetSelect.value = '';
+      solarSystem.clearSelection();
+    };
+    cardClose?.addEventListener('click', closeCard);
+    window.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && !card?.hasAttribute('hidden')) closeCard();
+    });
+
+    planetSelect?.addEventListener('change', () => {
+      if (planetSelect.value) solarSystem.focusByName(planetSelect.value);
+    });
+
+    scale?.addEventListener('click', () => {
+      const active = scale.getAttribute('aria-pressed') !== 'true';
+      scale.setAttribute('aria-pressed', String(active));
+      solarSystem.setRealScale(active);
+    });
+
+    dateInput?.addEventListener('change', () => {
+      if (dateInput.value) solarSystem.setDate(new Date(dateInput.value));
+    });
+    today?.addEventListener('click', () => {
+      const now = new Date();
+      if (dateInput) dateInput.value = now.toISOString().slice(0, 10);
+      solarSystem.setDate(now);
+    });
+
+    let shareReset: ReturnType<typeof setTimeout>;
+    share?.addEventListener('click', async () => {
+      const url = solarSystem.getShareUrl();
+      history.replaceState(null, '', url);
+      try {
+        await navigator.clipboard.writeText(url);
+        share.textContent = '¡Copiado!';
+      } catch {
+        share.textContent = 'URL lista';
+      }
+      clearTimeout(shareReset);
+      shareReset = setTimeout(() => (share.textContent = 'Compartir'), 1600);
+    });
+
+    perf?.addEventListener('click', () => {
+      const active = perf.getAttribute('aria-pressed') !== 'true';
+      perf.setAttribute('aria-pressed', String(active));
+      perfPanel?.toggleAttribute('hidden', !active);
+    });
+    canvas.addEventListener('stats', ((event: CustomEvent<{ fps: number }>) => {
+      if (perfPanel?.hasAttribute('hidden')) return;
+      if (perfFps) perfFps.textContent = String(event.detail.fps);
+    }) as EventListener);
+
+    const setMenuOpen = (open: boolean) => {
+      more?.setAttribute('aria-expanded', String(open));
+      extra?.classList.toggle('is-open', open);
+    };
+    more?.addEventListener('click', () => setMenuOpen(more.getAttribute('aria-expanded') !== 'true'));
+    // Close the mobile menu when tapping elsewhere or pressing Escape.
+    document.addEventListener('pointerdown', (event) => {
+      if (!extra?.classList.contains('is-open')) return;
+      const target = event.target as Node;
+      if (extra.contains(target) || more?.contains(target)) return;
+      setMenuOpen(false);
+    });
+    window.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') setMenuOpen(false);
+    });
+
+    window.addEventListener('beforeunload', () => {
+      solarSystem.dispose();
+    });
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initSolarSystem, { once: true });
+  } else {
+    initSolarSystem();
+  }
+</script>
+
+<style>
+  .solar-stage {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+    background:
+      radial-gradient(circle at 70% 40%, rgba(255, 123, 53, 0.11), transparent 14rem),
+      radial-gradient(circle at 50% 50%, rgba(255, 190, 92, 0.12), transparent 18rem),
+      radial-gradient(circle at 20% 15%, rgba(73, 117, 255, 0.18), transparent 22rem), #01020a;
+    color: white;
+    font-family: ui-serif, Georgia, Cambria, serif;
+  }
+
+  .solar-stage::before,
+  .solar-stage::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  .solar-stage::before {
+    background: radial-gradient(circle, transparent 42%, rgba(0, 0, 0, 0.58));
+  }
+
+  .solar-stage::after {
+    opacity: 0.14;
+    background-image: repeating-radial-gradient(
+      circle at 20% 30%,
+      rgba(255, 255, 255, 0.35) 0 1px,
+      transparent 1px 4px
+    );
+    mix-blend-mode: screen;
+  }
+
+  canvas {
+    display: block;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    touch-action: none;
+  }
+
+  .loader,
+  .intro,
+  .toolbar,
+  .planet-card,
+  .fallback {
+    position: absolute;
+    z-index: 4;
+  }
+
+  .loader {
+    inset: 0;
+    display: grid;
+    place-items: center;
+    background: #01020a;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    transition:
+      opacity 500ms ease,
+      visibility 500ms ease;
+  }
+
+  .loader.is-hidden,
+  .intro.is-hidden {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  .intro,
+  .planet-card,
+  .fallback {
+    width: min(24rem, calc(100vw - 2rem));
+    padding: 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 1.25rem;
+    background: linear-gradient(135deg, rgba(5, 10, 30, 0.78), rgba(25, 16, 8, 0.5));
+    box-shadow: 0 1.5rem 5rem rgba(0, 0, 0, 0.42);
+    backdrop-filter: blur(18px);
+  }
+
+  .intro {
+    left: 1rem;
+    top: 1rem;
+    transition:
+      opacity 260ms ease,
+      visibility 260ms ease;
+  }
+
+  .intro p,
+  .planet-card p {
+    margin: 0 0 0.35rem;
+    color: #ffc46b;
+    font:
+      700 0.72rem/1.2 ui-sans-serif,
+      system-ui,
+      sans-serif;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+
+  .intro h1,
+  .planet-card h2 {
+    margin: 0;
+    font-size: clamp(2rem, 8vw, 4.7rem);
+    line-height: 0.9;
+  }
+
+  .intro span,
+  .planet-card span,
+  .planet-card small,
+  .fallback {
+    display: block;
+    margin-top: 0.8rem;
+    color: rgba(255, 255, 255, 0.78);
+    font:
+      500 0.9rem/1.45 ui-sans-serif,
+      system-ui,
+      sans-serif;
+  }
+
+  button {
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 999px;
+    padding: 0.55rem 0.8rem;
+    background: rgba(255, 196, 107, 0.14);
+    color: white;
+    font:
+      700 0.78rem/1 ui-sans-serif,
+      system-ui,
+      sans-serif;
+    cursor: pointer;
+  }
+
+  button[aria-pressed='true'] {
+    background: rgba(255, 196, 107, 0.34);
+  }
+
+  .intro button {
+    margin-top: 1rem;
+  }
+
+  .toolbar {
+    left: 50%;
+    bottom: 1rem;
+    display: flex;
+    gap: 0.45rem;
+    align-items: center;
+    padding: 0.55rem;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 999px;
+    background: rgba(3, 7, 20, 0.62);
+    backdrop-filter: blur(16px);
+    transform: translateX(-50%);
+  }
+
+  .toolbar label {
+    display: flex;
+    gap: 0.45rem;
+    align-items: center;
+    color: rgba(255, 255, 255, 0.78);
+    font:
+      700 0.75rem/1 ui-sans-serif,
+      system-ui,
+      sans-serif;
+    white-space: nowrap;
+  }
+
+  .toolbar input {
+    width: 6rem;
+    accent-color: #ffc46b;
+  }
+
+  .toolbar input[type='date'] {
+    width: auto;
+    padding: 0.3rem 0.5rem;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 999px;
+    background: rgba(255, 196, 107, 0.14);
+    color: white;
+    font:
+      700 0.72rem/1 ui-sans-serif,
+      system-ui,
+      sans-serif;
+    color-scheme: dark;
+    cursor: pointer;
+  }
+
+  .toolbar select {
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 999px;
+    padding: 0.35rem 0.55rem;
+    background: rgba(255, 196, 107, 0.14);
+    color: white;
+    font:
+      700 0.75rem/1 ui-sans-serif,
+      system-ui,
+      sans-serif;
+    cursor: pointer;
+  }
+
+  .toolbar select option {
+    color: #111;
+  }
+
+  /* On desktop the secondary controls flow inline in the toolbar; the "more"
+     button only appears on small screens (see the mobile media query). */
+  .toolbar-extra {
+    display: contents;
+  }
+
+  .toolbar-more {
+    display: none;
+    width: 2.2rem;
+    height: 2.2rem;
+    padding: 0;
+    place-items: center;
+    font-size: 1.1rem;
+    line-height: 1;
+  }
+
+  .perf-panel {
+    position: absolute;
+    z-index: 4;
+    right: 1rem;
+    top: 1rem;
+    padding: 0.4rem 0.7rem;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 999px;
+    background: rgba(3, 7, 20, 0.62);
+    backdrop-filter: blur(16px);
+    color: rgba(255, 255, 255, 0.8);
+    font:
+      700 0.75rem/1 ui-sans-serif,
+      system-ui,
+      sans-serif;
+    letter-spacing: 0.08em;
+  }
+
+  .perf-panel[data-perf-panel][hidden] {
+    display: none;
+  }
+
+  .perf-panel span {
+    color: #ffc46b;
+  }
+
+  .planet-card {
+    right: 1rem;
+    bottom: 5rem;
+    padding-right: 2.6rem;
+    max-height: min(70vh, 32rem);
+    overflow-y: auto;
+  }
+
+  .planet-card h2 {
+    font-size: clamp(1.8rem, 5vw, 3.3rem);
+  }
+
+  .card-close {
+    position: absolute;
+    top: 0.7rem;
+    right: 0.7rem;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    display: grid;
+    place-items: center;
+    font-size: 1.3rem;
+    line-height: 1;
+    border-radius: 999px;
+  }
+
+  .planet-stats {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.55rem 0.9rem;
+    margin: 0.9rem 0 0;
+  }
+
+  .planet-stats div {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+  }
+
+  .planet-stats div:last-child {
+    grid-column: 1 / -1;
+  }
+
+  .planet-stats dt {
+    color: #ffc46b;
+    font:
+      700 0.62rem/1.2 ui-sans-serif,
+      system-ui,
+      sans-serif;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .planet-stats dd {
+    margin: 0;
+    color: rgba(255, 255, 255, 0.9);
+    font:
+      500 0.82rem/1.3 ui-sans-serif,
+      system-ui,
+      sans-serif;
+  }
+
+  .fallback {
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+  }
+
+  .fallback[hidden],
+  .planet-card[hidden] {
+    display: none;
+  }
+
+  :global(.solar-label) {
+    position: absolute;
+    left: 0;
+    top: 0;
+    z-index: 1;
+    padding: 0.25rem 0.55rem;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 999px;
+    background: rgba(4, 8, 24, 0.48);
+    color: rgba(255, 255, 255, 0.9);
+    font:
+      500 0.72rem/1.2 system-ui,
+      sans-serif;
+    letter-spacing: 0.04em;
+    pointer-events: none;
+    text-transform: uppercase;
+    transition: opacity 160ms ease;
+  }
+
+  :global(.solar-label.is-selected) {
+    border-color: rgba(255, 196, 107, 0.7);
+    background: rgba(255, 196, 107, 0.18);
+    color: #fff4cf;
+  }
+
+  @media (max-width: 720px) {
+    .intro {
+      top: 0.75rem;
+      left: 0.75rem;
+    }
+
+    /* Only the primary controls (pause, speed, "go to", more) stay in the bar;
+       the rest collapse into the "⋯" menu, so the row no longer swallows the
+       viewport on phones. */
+    .toolbar {
+      width: calc(100vw - 1rem);
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.35rem;
+      padding: 0.45rem 0.5rem;
+      border-radius: 1rem;
+    }
+
+    .toolbar button,
+    .toolbar select,
+    .toolbar input[type='date'] {
+      padding: 0.45rem 0.6rem;
+      font-size: 0.72rem;
+    }
+
+    .toolbar label {
+      font-size: 0.68rem;
+    }
+
+    .toolbar input[type='range'] {
+      width: 4.5rem;
+    }
+
+    .toolbar-more {
+      display: grid;
+    }
+
+    /* Secondary controls become a popover stacked above the toolbar. */
+    .toolbar-extra {
+      display: none;
+    }
+
+    .toolbar-extra.is-open {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0.4rem;
+      position: absolute;
+      right: 0.4rem;
+      bottom: calc(100% + 0.5rem);
+      width: 12.5rem;
+      padding: 0.6rem;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 1rem;
+      background: rgba(3, 7, 20, 0.94);
+      backdrop-filter: blur(16px);
+      box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.5);
+    }
+
+    .toolbar-extra.is-open > * {
+      width: 100%;
+    }
+
+    .toolbar-extra.is-open label {
+      justify-content: space-between;
+    }
+
+    .toolbar-extra.is-open input[type='date'] {
+      width: auto;
+    }
+
+    /* Full-width info card sitting just above the toolbar. */
+    .planet-card {
+      left: 0.75rem;
+      right: 0.75rem;
+      width: auto;
+      bottom: 5.25rem;
+      max-height: 46vh;
+    }
+
+    .planet-card h2 {
+      font-size: clamp(1.6rem, 9vw, 2.6rem);
+    }
+
+    .perf-panel {
+      top: 0.75rem;
+      right: 0.75rem;
+    }
+
+    :global(.solar-label) {
+      padding: 0.2rem 0.42rem;
+      font-size: 0.62rem;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    :global(*) {
+      transition-duration: 1ms !important;
+      animation-duration: 1ms !important;
+    }
+  }
+</style>
