@@ -5,43 +5,44 @@ const bodies = [SUN, ...PLANETS];
 ---
 
 <div class="solar-stage">
-  <div class="loader" data-loader role="status">Preparing orbits…</div>
+  <div class="loader" data-loader role="status" data-i18n="ui.loader">Preparing orbits…</div>
   <section class="intro" data-intro aria-label="Introduction">
-    <p>Orbital observatory</p>
-    <h1>Solar System 3D</h1>
-    <span>Drag to orbit, pinch or scroll to zoom in. Tap a planet to focus it.</span>
-    <button data-hide-intro>Explore</button>
+    <p data-i18n="ui.intro.kicker">Orbital observatory</p>
+    <h1 data-i18n="ui.intro.title">Solar System 3D</h1>
+    <span data-i18n="ui.intro.hint">Drag to orbit, pinch or scroll to zoom in. Tap a planet to focus it.</span>
+    <button data-hide-intro data-i18n="ui.intro.explore">Explore</button>
   </section>
-  <div class="fallback" data-fallback hidden>
+  <div class="fallback" data-fallback hidden data-i18n="ui.fallback">
     Your browser does not have WebGL enabled. Try another browser or enable hardware acceleration to view the 3D solar
     system.
   </div>
   <canvas id="solar-system" aria-label="Interactive 3D solar system"></canvas>
   <div class="toolbar" aria-label="Solar system controls">
-    <button data-pause aria-pressed="false">Pause</button>
-    <label>Speed <input data-speed type="range" min="0" max="2" value="1" step="0.1" /></label>
+    <button data-pause aria-pressed="false" data-i18n="ui.pause">Pause</button>
+    <label><span data-i18n="ui.speed">Speed</span> <input data-speed type="range" min="0" max="2" value="1" step="0.1" /></label>
     <label
-      >Go to
+      ><span data-i18n="ui.goto">Go to</span>
       <select data-planet-select aria-label="Go to a body">
         <option value="">—</option>
-        {bodies.map((body) => <option value={body.name}>{body.label}</option>)}
+        {bodies.map((body) => <option value={body.name} data-i18n-option={`${body.name}.label`}>{body.label}</option>)}
       </select>
     </label>
     <div class="toolbar-extra" data-extra>
       <label
-        >Date
+        ><span data-i18n="ui.date">Date</span>
         <input data-date type="date" aria-label="Planet positions on a date" />
       </label>
-      <button data-today>Today</button>
-      <button data-reset>Reset</button>
-      <button data-tour aria-pressed="false">Tour</button>
-      <button data-labels aria-pressed="true">Labels</button>
-      <button data-orbits aria-pressed="true">Orbits</button>
-      <button data-scale aria-pressed="false">Real scale</button>
-      <button data-share>Share</button>
-      <button data-perf aria-pressed="false">Performance</button>
+      <button data-today data-i18n="ui.today">Today</button>
+      <button data-reset data-i18n="ui.reset">Reset</button>
+      <button data-tour aria-pressed="false" data-i18n="ui.tour">Tour</button>
+      <button data-labels aria-pressed="true" data-i18n="ui.labels">Labels</button>
+      <button data-orbits aria-pressed="true" data-i18n="ui.orbits">Orbits</button>
+      <button data-scale aria-pressed="false" data-i18n="ui.realScale">Real scale</button>
+      <button data-share data-i18n="ui.share">Share</button>
+      <button data-perf aria-pressed="false" data-i18n="ui.performance">Performance</button>
     </div>
     <button class="toolbar-more" data-more aria-expanded="false" aria-label="More controls">⋯</button>
+    <button class="toolbar-lang" data-lang-toggle>EN</button>
   </div>
   <div class="perf-panel" data-perf-panel hidden role="status" aria-live="off">
     <span data-perf-fps>—</span> FPS
@@ -51,11 +52,11 @@ const bodies = [SUN, ...PLANETS];
     <p data-card-type></p>
     <h2 data-card-name></h2>
     <dl class="planet-stats">
-      <div><dt>Diameter</dt><dd data-card-diameter></dd></div>
-      <div><dt>Moons</dt><dd data-card-moons></dd></div>
-      <div><dt>Day</dt><dd data-card-day></dd></div>
-      <div><dt>Year</dt><dd data-card-year></dd></div>
-      <div><dt>Temperature</dt><dd data-card-temp></dd></div>
+      <div><dt data-i18n="ui.diameter">Diameter</dt><dd data-card-diameter></dd></div>
+      <div><dt data-i18n="ui.moons">Moons</dt><dd data-card-moons></dd></div>
+      <div><dt data-i18n="ui.day">Day</dt><dd data-card-day></dd></div>
+      <div><dt data-i18n="ui.year">Year</dt><dd data-card-year></dd></div>
+      <div><dt data-i18n="ui.temperature">Temperature</dt><dd data-card-temp></dd></div>
     </dl>
     <small data-card-note></small>
   </aside>
@@ -63,6 +64,7 @@ const bodies = [SUN, ...PLANETS];
 
 <script>
   import { SolarSystem } from '../utils/solarSystem';
+  import { t, getLang, setLang, type Lang } from '../data/i18n';
 
   const initSolarSystem = async () => {
     const canvas = document.querySelector<HTMLCanvasElement>('#solar-system');
@@ -98,6 +100,7 @@ const bodies = [SUN, ...PLANETS];
     const perfFps = document.querySelector<HTMLElement>('[data-perf-fps]');
     const more = document.querySelector<HTMLButtonElement>('[data-more]');
     const extra = document.querySelector<HTMLElement>('[data-extra]');
+    const langToggle = document.querySelector<HTMLButtonElement>('[data-lang-toggle]');
 
     loader?.classList.add('is-hidden');
     document
@@ -106,7 +109,7 @@ const bodies = [SUN, ...PLANETS];
     pause?.addEventListener('click', () => {
       const pressed = pause.getAttribute('aria-pressed') !== 'true';
       pause.setAttribute('aria-pressed', String(pressed));
-      pause.textContent = pressed ? 'Resume' : 'Pause';
+      pause.textContent = pressed ? t('ui.resume') : t('ui.pause');
       solarSystem.setPaused(pressed);
     });
     speed?.addEventListener('input', () => solarSystem.setSpeed(Number(speed.value)));
@@ -123,7 +126,7 @@ const bodies = [SUN, ...PLANETS];
     });
     const setTourActive = (active: boolean) => {
       tour?.setAttribute('aria-pressed', String(active));
-      if (tour) tour.textContent = active ? 'Stop' : 'Tour';
+      if (tour) tour.textContent = active ? t('ui.stop') : t('ui.tour');
     };
     tour?.addEventListener('click', () => {
       const active = tour.getAttribute('aria-pressed') !== 'true';
@@ -194,12 +197,12 @@ const bodies = [SUN, ...PLANETS];
       history.replaceState(null, '', url);
       try {
         await navigator.clipboard.writeText(url);
-        share.textContent = 'Copied!';
+        share.textContent = t('ui.copied');
       } catch {
-        share.textContent = 'URL ready';
+        share.textContent = t('ui.urlReady');
       }
       clearTimeout(shareReset);
-      shareReset = setTimeout(() => (share.textContent = 'Share'), 1600);
+      shareReset = setTimeout(() => (share.textContent = t('ui.share')), 1600);
     });
 
     perf?.addEventListener('click', () => {
@@ -217,7 +220,6 @@ const bodies = [SUN, ...PLANETS];
       extra?.classList.toggle('is-open', open);
     };
     more?.addEventListener('click', () => setMenuOpen(more.getAttribute('aria-expanded') !== 'true'));
-    // Close the mobile menu when tapping elsewhere or pressing Escape.
     document.addEventListener('pointerdown', (event) => {
       if (!extra?.classList.contains('is-open')) return;
       const target = event.target as Node;
@@ -227,6 +229,40 @@ const bodies = [SUN, ...PLANETS];
     window.addEventListener('keydown', (event) => {
       if (event.key === 'Escape') setMenuOpen(false);
     });
+
+    const updateAllTexts = () => {
+      document.querySelectorAll('[data-i18n]').forEach((el) => {
+        const key = el.getAttribute('data-i18n')!;
+        el.textContent = t(key);
+      });
+      document.querySelectorAll('[data-i18n-option]').forEach((el) => {
+        const key = el.getAttribute('data-i18n-option')!;
+        el.textContent = t(key);
+      });
+      document.querySelectorAll('[data-i18n-aria]').forEach((el) => {
+        const key = el.getAttribute('data-i18n-aria')!;
+        el.setAttribute('aria-label', t(key));
+      });
+      if (pause) pause.textContent = pause.getAttribute('aria-pressed') === 'true' ? t('ui.resume') : t('ui.pause');
+      if (tour) tour.textContent = tour.getAttribute('aria-pressed') === 'true' ? t('ui.stop') : t('ui.tour');
+      if (share) share.textContent = t('ui.share');
+      if (langToggle) langToggle.textContent = getLang().toUpperCase();
+      document.documentElement.lang = getLang();
+      document.title = t('ui.title');
+      document.querySelector('meta[name="description"]')?.setAttribute('content', t('ui.description'));
+      solarSystem.updateLang();
+    };
+
+    if (langToggle) {
+      langToggle.textContent = getLang().toUpperCase();
+      langToggle.addEventListener('click', () => {
+        const next: Lang = getLang() === 'en' ? 'es' : 'en';
+        setLang(next);
+        updateAllTexts();
+      });
+    }
+
+    updateAllTexts();
 
     window.addEventListener('beforeunload', () => {
       solarSystem.dispose();
@@ -464,6 +500,16 @@ const bodies = [SUN, ...PLANETS];
     place-items: center;
     font-size: 1.1rem;
     line-height: 1;
+  }
+
+  .toolbar-lang {
+    width: 2.2rem;
+    height: 2.2rem;
+    padding: 0;
+    place-items: center;
+    font-size: 0.7rem;
+    line-height: 1;
+    letter-spacing: 0.04em;
   }
 
   .perf-panel {

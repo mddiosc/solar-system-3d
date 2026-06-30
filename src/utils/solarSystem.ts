@@ -5,6 +5,7 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
+import { t } from '../data/i18n';
 import {
   ASTEROID_BELT,
   COMET,
@@ -416,7 +417,7 @@ export class SolarSystem {
     const holder = new THREE.Group();
     holder.add(sun);
     this.scene.add(holder);
-    this.addLabel('Sol', sun);
+    this.addLabel(t('Sun.label'), sun);
     this.planets.push({
       mesh: sun,
       holder,
@@ -453,7 +454,7 @@ export class SolarSystem {
 
     const orbitLine = this.createOrbitLine(semiMajor, semiMinor, focusOffset);
     this.scene.add(orbitLine, holder);
-    this.addLabel(options.label, mesh);
+    this.addLabel(t(`${options.name}.label`), mesh);
 
     const cloudMesh = options.hasClouds ? this.createCloudLayer(options) : undefined;
     if (cloudMesh) mesh.add(cloudMesh);
@@ -1226,6 +1227,31 @@ export class SolarSystem {
   }
 
   private getPlanetDetail(planet: Planet): PlanetDetail {
-    return { key: planet.options.name, name: planet.options.label, facts: planet.options.facts };
+    const name = planet.options.name;
+    return {
+      key: name,
+      name: t(`${name}.label`),
+      facts: {
+        type: t(`${name}.type`),
+        diameter: planet.options.facts.diameter,
+        moons: t(`${name}.moons`),
+        day: t(`${name}.day`),
+        year: t(`${name}.year`),
+        temp: t(`${name}.temp`),
+        note: t(`${name}.note`),
+      },
+    };
+  }
+
+  updateLang(): void {
+    for (const planet of this.planets) {
+      const label = planet.mesh.userData.label as HTMLDivElement | undefined;
+      if (label) label.textContent = t(`${planet.options.name}.label`);
+    }
+    if (this.selected) {
+      this.canvas.dispatchEvent(
+        new CustomEvent<PlanetDetail>('select', { detail: this.getPlanetDetail(this.selected) })
+      );
+    }
   }
 }
