@@ -72,6 +72,8 @@ export class SolarSystem {
   private readonly finalComposer: EffectComposer;
   private readonly bloomLayer = new THREE.Layers();
   private readonly darkMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
+  private readonly orbitMaterial = new THREE.LineBasicMaterial({ color: 0x31456c, transparent: true, opacity: 0.34 });
+  private readonly mutedOrbitMaterial = new THREE.LineBasicMaterial({ color: 0x1a2742, transparent: true, opacity: 0.08 });
   private readonly savedMaterials = new Map<string, THREE.Material | THREE.Material[]>();
   private readonly controls: OrbitControls;
   private readonly textureLoader = new THREE.TextureLoader();
@@ -272,6 +274,7 @@ export class SolarSystem {
   /** Clear the current selection (e.g. when the info card is closed). */
   clearSelection(): void {
     this.selected = undefined;
+    this.updateFocusMode();
   }
 
   /** Build a shareable URL encoding the current camera framing and selection in the hash. */
@@ -318,6 +321,8 @@ export class SolarSystem {
     this.bloomComposer.dispose();
     this.finalComposer.dispose();
     this.darkMaterial.dispose();
+    this.orbitMaterial.dispose();
+    this.mutedOrbitMaterial.dispose();
     this.renderer.dispose();
 
     this.scene.traverse((object) => {
@@ -460,6 +465,12 @@ export class SolarSystem {
     if (cloudMesh) mesh.add(cloudMesh);
 
     if (options.hasRings) mesh.add(this.createSaturnRings(options.radius));
+
+    // Atmospheric glow for planets with substantial atmospheres.
+    if (options.name === 'Earth') mesh.add(this.addAtmosphere(options.radius, 0x5da8ff, 0.18));
+    if (options.name === 'Venus') mesh.add(this.addAtmosphere(options.radius, 0xd8ad62, 0.28));
+    if (options.name === 'Mars') mesh.add(this.addAtmosphere(options.radius, 0xc45c3a, 0.12));
+
     const moons = options.moons ? this.addMoons(tilt, options.moons) : [];
 
     const angle = Math.random() * Math.PI * 2;
@@ -536,8 +547,15 @@ export class SolarSystem {
 
     return new THREE.LineLoop(
       new THREE.BufferGeometry().setFromPoints(points),
-      new THREE.LineBasicMaterial({ color: 0x31456c, transparent: true, opacity: 0.34 })
+      this.orbitMaterial
     );
+  }
+
+  private updateFocusMode(): void {
+    for (const planet of this.planets) {
+      if (!planet.orbitLine) continue;
+      planet.orbitLine.material = this.selected && planet !== this.selected ? this.mutedOrbitMaterial : this.orbitMaterial;
+    }
   }
 
   /** Regenerate a planet's orbit line after its ellipse changed (real-scale toggle). */
@@ -1278,37 +1296,53 @@ export class SolarSystem {
     return texture;
   }
 
-  private createSaturnRings(radius: number): THREE.Mesh {
-    const ring = new THREE.Mesh(
-      new THREE.RingGeometry(radius * 1.45, radius * 2.45, 128),
-      new THREE.MeshBasicMaterial({
-        map: this.createRingTexture(),
-        side: THREE.DoubleSide,
+  private addAtmosphere(radius: number, color: number, opacity: number): THREE.Mesh {
+    return new THREE.Mesh(
+      new THREE.SphereGeometry(radius * 1.08, 64, 64),
+      new THREE.ShaderMaterial({
+        uniforms: {
+          glowColor: { value: new THREE.Color(color) },
+          intensity: { value: opacity },
+        },
+        vertexShader:
+          'varying vec3 vNormal; varying vec3 vViewPosition; void main() { vNormal = normalize(normalMatrix * normal); vec4 mvPosition = modelViewMatrix * vec4(position, 1.0); vViewPosition = -mvPosition.xyz; gl_Position = projectionMatrix * mvPosition; }',
+        fragmentShader:
+          'uniform vec3 glowColor; uniform float intensity; varying vec3 vNormal; varying vec3 vViewPosition; void main() { float rim = 1.0 - max(dot(normalize(vNormal), normalize(vViewPosition)), 0.0); gl_FragColor = vec4(glowColor, pow(rim, 2.2) * intensity); }',
         transparent: true,
-        opacity: 0.82,
+        side: THREE.FrontSide,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
       })
     );
-
-    ring.rotation.x = Math.PI * 0.5;
-    ring.rotation.y = Math.PI * 0.08;
-    return ring;
   }
 
-  private createRingTexture(): THREE.CanvasTexture {
-    const canvas = document.createElement('canvas');
-    canvas.width = 512;
-    canvas.height = 16;
-    const context = canvas.getContext('2d');
-    if (!context) throw new Error('Canvas 2D context unavailable');
+  private createSaturnRings(radius: number): THREE.Group {
+    const group = new THREE.Group();
+    const bands = [
+      { inner: 1.14, outer: 1.24, color: 0x7d7056, opacity: 0.14 },
+      { inner: 1.27, outer: 1.54, color: 0xd8c694, opacity: 0.44 },
+      { inner: 1.57, outer: 1.62, color: 0x1a1510, opacity: 0.26 },
+      { inner: 1.66, outer: 2.02, color: 0xb6a680, opacity: 0.32 },
+      { inner: 2.06, outer: 2.2, color: 0xe4d4aa, opacity: 0.2 },
+    ];
 
-    for (let x = 0; x < canvas.width; x += 1) {
-      context.fillStyle = x % 19 < 3 ? 'rgba(90, 78, 54, 0.18)' : 'rgba(232, 211, 162, 0.78)';
-      context.fillRect(x, 0, 1, canvas.height);
+    for (const band of bands) {
+      const ring = new THREE.Mesh(
+        new THREE.RingGeometry(radius * band.inner, radius * band.outer, 128),
+        new THREE.MeshBasicMaterial({
+          color: band.color,
+          side: THREE.DoubleSide,
+          transparent: true,
+          opacity: band.opacity,
+          depthWrite: false,
+        })
+      );
+      group.add(ring);
     }
 
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.colorSpace = THREE.SRGBColorSpace;
-    return texture;
+    group.rotation.x = Math.PI * 0.5;
+    group.rotation.y = Math.PI * 0.08;
+    return group;
   }
 
   private loadTexture(path: string): THREE.Texture {
@@ -1446,6 +1480,7 @@ export class SolarSystem {
 
   private focusPlanet(planet: Planet): void {
     this.selected = planet;
+    this.updateFocusMode();
     const world = new THREE.Vector3();
     planet.mesh.getWorldPosition(world);
     const direction = new THREE.Vector3().subVectors(this.camera.position, world).normalize();
