@@ -717,6 +717,15 @@ export class SolarSystem {
       });
     }
 
+    if (options.name === 'Jupiter' || options.name === 'Mars' || options.name === 'Neptune') {
+      const texturePath = `/textures/${options.name.toLowerCase()}_2048.jpg`;
+      return new THREE.MeshStandardMaterial({
+        map: this.loadTexture(texturePath),
+        roughness: options.texture === 'ice' ? 0.55 : 0.72,
+        metalness: 0,
+      });
+    }
+
     return new THREE.MeshStandardMaterial({
       map: this.createPlanetTexture(options),
       bumpMap: this.createBumpTexture(options),
@@ -732,8 +741,8 @@ export class SolarSystem {
 
   private createPlanetTexture(options: PlanetOptions): THREE.CanvasTexture {
     const canvas = document.createElement('canvas');
-    canvas.width = 768;
-    canvas.height = 384;
+    canvas.width = 1024;
+    canvas.height = 512;
     const context = canvas.getContext('2d');
     if (!context) throw new Error('Canvas 2D context unavailable');
 
@@ -741,7 +750,15 @@ export class SolarSystem {
     context.fillStyle = base;
     context.fillRect(0, 0, canvas.width, canvas.height);
 
-    if (options.texture === 'gas' || options.texture === 'ice' || options.texture === 'venus') {
+    if (options.name === 'Mercury') {
+      this.paintMercury(context, canvas, base, accent, dark);
+    } else if (options.name === 'Venus') {
+      this.paintVenus(context, canvas, base, accent, dark);
+    } else if (options.name === 'Uranus') {
+      this.paintUranus(context, canvas, base, accent, dark);
+    } else if (options.name === 'Saturn') {
+      this.paintSaturn(context, canvas, base, accent, dark);
+    } else if (options.texture === 'gas' || options.texture === 'ice' || options.texture === 'venus') {
       this.paintBands(
         context,
         canvas,
@@ -865,6 +882,214 @@ export class SolarSystem {
     context.fill();
   }
 
+  private paintMercury(
+    context: CanvasRenderingContext2D,
+    canvas: HTMLCanvasElement,
+    base: string,
+    light: string,
+    dark: string
+  ): void {
+    // Large darker maria-like plains.
+    context.fillStyle = dark;
+    for (let i = 0; i < 14; i += 1) {
+      context.globalAlpha = THREE.MathUtils.randFloat(0.18, 0.38);
+      context.beginPath();
+      context.ellipse(
+        THREE.MathUtils.randInt(0, canvas.width),
+        THREE.MathUtils.randInt(0, canvas.height),
+        THREE.MathUtils.randInt(60, 160),
+        THREE.MathUtils.randInt(30, 80),
+        THREE.MathUtils.randFloat(0, Math.PI),
+        0,
+        Math.PI * 2
+      );
+      context.fill();
+    }
+
+    // Rays from fresh craters.
+    for (let i = 0; i < 9; i += 1) {
+      const cx = THREE.MathUtils.randInt(canvas.width * 0.1, canvas.width * 0.9);
+      const cy = THREE.MathUtils.randInt(canvas.height * 0.15, canvas.height * 0.85);
+      const rayCount = THREE.MathUtils.randInt(8, 16);
+      const rayLen = THREE.MathUtils.randInt(40, 90);
+      context.strokeStyle = light;
+      context.globalAlpha = THREE.MathUtils.randFloat(0.12, 0.24);
+      context.lineWidth = THREE.MathUtils.randFloat(0.5, 1.5);
+      for (let r = 0; r < rayCount; r += 1) {
+        const angle = (r / rayCount) * Math.PI * 2 + THREE.MathUtils.randFloatSpread(0.2);
+        context.beginPath();
+        context.moveTo(cx, cy);
+        context.lineTo(cx + Math.cos(angle) * rayLen, cy + Math.sin(angle) * rayLen);
+        context.stroke();
+      }
+    }
+
+    // Lots of impact craters with rims.
+    for (let i = 0; i < 350; i += 1) {
+      const x = THREE.MathUtils.randInt(0, canvas.width);
+      const y = THREE.MathUtils.randInt(0, canvas.height);
+      const rx = THREE.MathUtils.randInt(3, 22);
+      const ry = rx * THREE.MathUtils.randFloat(0.55, 0.9);
+      context.fillStyle = i % 4 === 0 ? dark : base;
+      context.globalAlpha = THREE.MathUtils.randFloat(0.22, 0.55);
+      context.beginPath();
+      context.ellipse(x, y, rx, ry, THREE.MathUtils.randFloat(0, Math.PI), 0, Math.PI * 2);
+      context.fill();
+      // Crater rim highlight.
+      context.strokeStyle = light;
+      context.globalAlpha = THREE.MathUtils.randFloat(0.15, 0.35);
+      context.lineWidth = 1;
+      context.beginPath();
+      context.ellipse(x - rx * 0.25, y - ry * 0.25, rx * 0.85, ry * 0.85, THREE.MathUtils.randFloat(0, Math.PI), 0, Math.PI * 2);
+      context.stroke();
+    }
+
+    context.globalAlpha = 1;
+  }
+
+  private paintVenus(
+    context: CanvasRenderingContext2D,
+    canvas: HTMLCanvasElement,
+    base: string,
+    accent: string,
+    dark: string
+  ): void {
+    // Subtle mottled surface showing through the haze.
+    this.paintRock(context, canvas, accent, dark, 70);
+
+    // Dense golden cloud streaks.
+    context.strokeStyle = 'rgba(255, 240, 190, 0.28)';
+    for (let i = 0; i < 60; i += 1) {
+      const y = THREE.MathUtils.randInt(10, canvas.height - 10);
+      context.lineWidth = THREE.MathUtils.randFloat(1, 4);
+      context.globalAlpha = THREE.MathUtils.randFloat(0.15, 0.4);
+      context.beginPath();
+      context.moveTo(0, y);
+      context.bezierCurveTo(
+        canvas.width * 0.25,
+        y + THREE.MathUtils.randInt(-30, 30),
+        canvas.width * 0.75,
+        y + THREE.MathUtils.randInt(-30, 30),
+        canvas.width,
+        y + THREE.MathUtils.randInt(-20, 20)
+      );
+      context.stroke();
+    }
+
+    // Soft cloud swirls.
+    for (let i = 0; i < 18; i += 1) {
+      const x = THREE.MathUtils.randInt(0, canvas.width);
+      const y = THREE.MathUtils.randInt(0, canvas.height);
+      const gradient = context.createRadialGradient(x, y, 8, x, y, 90);
+      gradient.addColorStop(0, 'rgba(255, 238, 190, 0.22)');
+      gradient.addColorStop(1, 'rgba(255, 220, 140, 0)');
+      context.fillStyle = gradient;
+      context.globalAlpha = THREE.MathUtils.randFloat(0.3, 0.6);
+      context.beginPath();
+      context.ellipse(x, y, 90, 45, THREE.MathUtils.randFloat(0, Math.PI), 0, Math.PI * 2);
+      context.fill();
+    }
+
+    context.globalAlpha = 1;
+  }
+
+  private paintUranus(
+    context: CanvasRenderingContext2D,
+    canvas: HTMLCanvasElement,
+    base: string,
+    accent: string,
+    dark: string
+  ): void {
+    // Smooth cyan base wash.
+    const gradient = context.createLinearGradient(0, 0, 0, canvas.height);
+    gradient.addColorStop(0, dark);
+    gradient.addColorStop(0.5, base);
+    gradient.addColorStop(1, dark);
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Very subtle methane banding.
+    for (let i = 0; i < 28; i += 1) {
+      const y = (i / 28) * canvas.height;
+      context.strokeStyle = i % 3 === 0 ? accent : dark;
+      context.globalAlpha = THREE.MathUtils.randFloat(0.08, 0.22);
+      context.lineWidth = THREE.MathUtils.randFloat(2, 6);
+      context.beginPath();
+      context.moveTo(0, y);
+      for (let x = 0; x <= canvas.width; x += 64) {
+        context.lineTo(x, y + Math.sin(x * 0.012 + i) * THREE.MathUtils.randFloat(1, 5));
+      }
+      context.stroke();
+    }
+
+    // A couple of faint bright polar collars.
+    for (const y of [canvas.height * 0.12, canvas.height * 0.88]) {
+      const collar = context.createRadialGradient(canvas.width * 0.5, y, 5, canvas.width * 0.5, y, 80);
+      collar.addColorStop(0, 'rgba(180, 245, 255, 0.25)');
+      collar.addColorStop(1, 'rgba(180, 245, 255, 0)');
+      context.fillStyle = collar;
+      context.globalAlpha = 0.6;
+      context.beginPath();
+      context.ellipse(canvas.width * 0.5, y, canvas.width * 0.45, 40, 0, 0, Math.PI * 2);
+      context.fill();
+    }
+
+    context.globalAlpha = 1;
+  }
+
+  private paintSaturn(
+    context: CanvasRenderingContext2D,
+    canvas: HTMLCanvasElement,
+    base: string,
+    accent: string,
+    dark: string
+  ): void {
+    // Soft cream base.
+    const gradient = context.createLinearGradient(0, 0, 0, canvas.height);
+    gradient.addColorStop(0, dark);
+    gradient.addColorStop(0.5, base);
+    gradient.addColorStop(1, dark);
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Wide, gentle cloud bands with alternating tones.
+    for (let i = 0; i < 38; i += 1) {
+      const y = (i / 38) * canvas.height;
+      context.fillStyle = i % 2 === 0 ? accent : dark;
+      context.globalAlpha = THREE.MathUtils.randFloat(0.18, 0.42);
+      context.beginPath();
+      context.moveTo(0, y);
+      for (let x = 0; x <= canvas.width; x += 96) {
+        context.lineTo(x, y + Math.sin(x * 0.008 + i * 0.7) * THREE.MathUtils.randFloat(2, 10));
+      }
+      context.lineTo(canvas.width, y + THREE.MathUtils.randInt(6, 22));
+      context.lineTo(0, y + THREE.MathUtils.randInt(6, 22));
+      context.fill();
+    }
+
+    // Subtle equatorial brightening.
+    const equator = context.createRadialGradient(canvas.width * 0.5, canvas.height * 0.5, 10, canvas.width * 0.5, canvas.height * 0.5, canvas.width * 0.55);
+    equator.addColorStop(0, 'rgba(255, 250, 220, 0.12)');
+    equator.addColorStop(1, 'rgba(255, 250, 220, 0)');
+    context.fillStyle = equator;
+    context.globalAlpha = 0.7;
+    context.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Faint polar hexagon-like storm hint (subtle, not literal geometry).
+    for (const y of [canvas.height * 0.14, canvas.height * 0.86]) {
+      const storm = context.createRadialGradient(canvas.width * 0.5, y, 4, canvas.width * 0.5, y, 55);
+      storm.addColorStop(0, 'rgba(210, 180, 140, 0.22)');
+      storm.addColorStop(1, 'rgba(210, 180, 140, 0)');
+      context.fillStyle = storm;
+      context.globalAlpha = 0.6;
+      context.beginPath();
+      context.ellipse(canvas.width * 0.5, y, 55, 30, 0, 0, Math.PI * 2);
+      context.fill();
+    }
+
+    context.globalAlpha = 1;
+  }
+
   private paintVenusClouds(context: CanvasRenderingContext2D, canvas: HTMLCanvasElement): void {
     context.strokeStyle = 'rgba(255, 238, 188, 0.34)';
     for (let i = 0; i < 34; i += 1) {
@@ -895,15 +1120,21 @@ export class SolarSystem {
 
   private createBumpTexture(options: PlanetOptions): THREE.CanvasTexture {
     const canvas = document.createElement('canvas');
-    canvas.width = 384;
-    canvas.height = 192;
+    canvas.width = 512;
+    canvas.height = 256;
     const context = canvas.getContext('2d');
     if (!context) throw new Error('Canvas 2D context unavailable');
 
     context.fillStyle = '#808080';
     context.fillRect(0, 0, canvas.width, canvas.height);
 
-    if (options.texture === 'gas' || options.texture === 'ice' || options.texture === 'venus') {
+    if (options.name === 'Mercury') {
+      this.paintMercury(context, canvas, '#808080', '#999999', '#666666');
+    } else if (options.name === 'Uranus') {
+      this.paintUranus(context, canvas, '#808080', '#909090', '#707070');
+    } else if (options.name === 'Saturn') {
+      this.paintSaturn(context, canvas, '#808080', '#909090', '#707070');
+    } else if (options.texture === 'gas' || options.texture === 'ice' || options.texture === 'venus') {
       this.paintBands(context, canvas, ['#777', '#999', '#6d6d6d'], options.name === 'Jupiter' ? 50 : 26);
     } else {
       this.paintRock(context, canvas, '#aaa', '#555', options.texture === 'mars' ? 160 : 100);
@@ -932,32 +1163,68 @@ export class SolarSystem {
 
   private createSunTexture(): THREE.CanvasTexture {
     const canvas = document.createElement('canvas');
-    canvas.width = 768;
-    canvas.height = 384;
+    canvas.width = 1024;
+    canvas.height = 512;
     const context = canvas.getContext('2d');
     if (!context) throw new Error('Canvas 2D context unavailable');
 
-    const gradient = context.createLinearGradient(0, 0, canvas.width, canvas.height);
-    gradient.addColorStop(0, '#fff4b0');
-    gradient.addColorStop(0.45, '#ff9f1c');
-    gradient.addColorStop(1, '#c92a0e');
-    context.fillStyle = gradient;
+    // Base radial gradient from bright core to deeper orange-red.
+    const base = context.createRadialGradient(
+      canvas.width * 0.4,
+      canvas.height * 0.4,
+      canvas.width * 0.1,
+      canvas.width * 0.5,
+      canvas.height * 0.5,
+      canvas.width * 0.8
+    );
+    base.addColorStop(0, '#fff5c2');
+    base.addColorStop(0.2, '#ffdf8a');
+    base.addColorStop(0.45, '#ff9f1c');
+    base.addColorStop(0.75, '#e25810');
+    base.addColorStop(1, '#8a1c05');
+    context.fillStyle = base;
     context.fillRect(0, 0, canvas.width, canvas.height);
 
-    for (let i = 0; i < 220; i += 1) {
-      context.strokeStyle = `rgba(255, ${THREE.MathUtils.randInt(140, 235)}, 35, 0.34)`;
-      context.lineWidth = THREE.MathUtils.randFloat(1, 6);
+    // Fine turbulent granulation: many small ellipses.
+    for (let i = 0; i < 1800; i += 1) {
+      const x = THREE.MathUtils.randInt(0, canvas.width);
+      const y = THREE.MathUtils.randInt(0, canvas.height);
+      const size = THREE.MathUtils.randInt(1, 4);
+      context.fillStyle = `rgba(255, ${THREE.MathUtils.randInt(180, 240)}, ${THREE.MathUtils.randInt(40, 120)}, ${THREE.MathUtils.randFloat(0.08, 0.28)})`;
       context.beginPath();
-      context.moveTo(0, THREE.MathUtils.randInt(0, canvas.height));
+      context.ellipse(x, y, size * 2, size, THREE.MathUtils.randFloat(0, Math.PI), 0, Math.PI * 2);
+      context.fill();
+    }
+
+    // Larger filament-like streaks.
+    for (let i = 0; i < 90; i += 1) {
+      context.strokeStyle = `rgba(${THREE.MathUtils.randInt(160, 220)}, ${THREE.MathUtils.randInt(60, 120)}, 20, ${THREE.MathUtils.randFloat(0.12, 0.28)})`;
+      context.lineWidth = THREE.MathUtils.randFloat(1, 4);
+      context.beginPath();
+      const y = THREE.MathUtils.randInt(0, canvas.height);
+      context.moveTo(0, y);
       context.bezierCurveTo(
-        190,
-        THREE.MathUtils.randInt(0, canvas.height),
-        470,
-        THREE.MathUtils.randInt(0, canvas.height),
+        canvas.width * 0.3,
+        y + THREE.MathUtils.randInt(-40, 40),
+        canvas.width * 0.7,
+        y + THREE.MathUtils.randInt(-40, 40),
         canvas.width,
-        THREE.MathUtils.randInt(0, canvas.height)
+        y + THREE.MathUtils.randInt(-30, 30)
       );
       context.stroke();
+    }
+
+    // A few brighter active regions.
+    for (let i = 0; i < 8; i += 1) {
+      const x = THREE.MathUtils.randInt(canvas.width * 0.2, canvas.width * 0.8);
+      const y = THREE.MathUtils.randInt(canvas.height * 0.2, canvas.height * 0.8);
+      const gradient = context.createRadialGradient(x, y, 8, x, y, 70);
+      gradient.addColorStop(0, 'rgba(255, 230, 160, 0.45)');
+      gradient.addColorStop(1, 'rgba(255, 140, 40, 0)');
+      context.fillStyle = gradient;
+      context.beginPath();
+      context.ellipse(x, y, 70, 40, THREE.MathUtils.randFloat(0, Math.PI), 0, Math.PI * 2);
+      context.fill();
     }
 
     const texture = new THREE.CanvasTexture(canvas);
